@@ -1,0 +1,8 @@
+[package]
+name = "pathtracer"
+version = "0.1.0"
+authors = ["Daniel Fockler <danielf@mammothhr.com>"]
+edition = "2018"
+
+[dependencies]
+image = "*"
