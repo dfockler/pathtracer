@@ -58,6 +58,6 @@ struct Ray {
 
 // Probably more information need for this
 struct Light {
-    pos: (u32, u32),
+    pos: (u32, u32, u32),
     mag: u32
 }
