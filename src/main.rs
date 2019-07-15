@@ -17,15 +17,21 @@ fn main() {
         let dir_x = (x as f32 - 511.0 / 2.0).round();
         let dir_y = (-(y as f32) + 511.0 / 2.0).round();
 
-        *pixel = image::Rgba(pathtraced(Ray{ pos: Vector::new(0.0, 0.0, 0.0), dir: Vector::new(dir_x / 256.0, dir_y / 256.0, 1.0) }, &scene));
+        *pixel = image::Rgba(trace_path(Ray{ pos: Vector::new(0.0, 0.0, 0.0), dir: Vector::new(dir_x / 256.0, dir_y / 256.0, 1.0) }, &scene));
     }
 
     img.save("output.png").unwrap();
 }
 
-fn pathtraced(ray: Ray, scene: &Vec<Sphere>) -> [u8; 4] {
+fn trace_path(ray: Ray, scene: &Vec<Sphere>) -> [u8; 4] {
     let mut color = [0, 0, 0, 255];
 
+    let sphere = object_hit(&ray, &scene);
+
+    color
+}
+
+fn object_hit(ray: &Ray, scene: &Vec<Sphere>) -> Sphere {
     for sphere in scene {
         match intersect(&ray, &sphere) {
             Some(new_ray) => {
@@ -34,8 +40,6 @@ fn pathtraced(ray: Ray, scene: &Vec<Sphere>) -> [u8; 4] {
             None => (),
         }
     }
-
-    color
 }
 
 fn intersect(ray: &Ray, sphere: &Sphere) -> Option<Vector> {
