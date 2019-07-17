@@ -7,8 +7,8 @@ const SIZE: f32 = 512.0;
 
 fn main() {
     let scene = vec!(
-        Sphere { pos: Vector::new(0f32, 0f32, 400f32), radius: 50f32, color: (255, 0, 0) },
-        // Sphere { pos: Vector::new(20f32, 45f32, 200f32), radius: 40f32, color: (0, 255, 0) },
+        Sphere { pos: Vector::new(50f32, 0f32, 200f32), radius: 10f32, color: [0, 255, 0, 255] },
+        Sphere { pos: Vector::new(0f32, 0f32, 400f32), radius: 50f32, color: [255, 0, 0, 255] },
     );
 
     let mut img = ImageBuffer::new(SIZE as u32, SIZE as u32);
@@ -17,29 +17,26 @@ fn main() {
         let dir_x = (x as f32 - 511.0 / 2.0).round();
         let dir_y = (-(y as f32) + 511.0 / 2.0).round();
 
-        *pixel = image::Rgba(trace_path(Ray{ pos: Vector::new(0.0, 0.0, 0.0), dir: Vector::new(dir_x / 256.0, dir_y / 256.0, 1.0) }, &scene));
+        *pixel = image::Rgba(trace_path(Ray{ pos: Vector::new(dir_x, dir_y, 0.0), dir: Vector::new(dir_x / 256.0, dir_y / 256.0, 1.0) }, &scene));
     }
 
     img.save("output.png").unwrap();
 }
 
 fn trace_path(ray: Ray, scene: &Vec<Sphere>) -> [u8; 4] {
-    let mut color = [0, 0, 0, 255];
+    let object = object_hit(&ray, &scene);
 
-    let sphere = object_hit(&ray, &scene);
+    if object.is_none() {
+        return [0, 0, 0, 255];
+    }
 
-    color
+    let sphere = object.unwrap();
+
+    sphere.color
 }
 
-fn object_hit(ray: &Ray, scene: &Vec<Sphere>) -> Sphere {
-    for sphere in scene {
-        match intersect(&ray, &sphere) {
-            Some(new_ray) => {
-                color = [sphere.color.0, sphere.color.1, sphere.color.2, 255]
-            },
-            None => (),
-        }
-    }
+fn object_hit<'a>(ray: &Ray, scene: &'a Vec<Sphere>) -> Option<&'a Sphere> {
+    scene.iter().find(|sphere| intersect(&ray, &sphere).is_some())
 }
 
 fn intersect(ray: &Ray, sphere: &Sphere) -> Option<Vector> {
@@ -70,7 +67,7 @@ fn intersect(ray: &Ray, sphere: &Sphere) -> Option<Vector> {
 struct Sphere {
     pos: Vector,
     radius: f32,
-    color: (u8, u8, u8)
+    color: [u8; 4]
 }
 
 #[derive(Debug)]
