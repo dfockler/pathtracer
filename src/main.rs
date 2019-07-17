@@ -7,8 +7,8 @@ const SIZE: f32 = 512.0;
 
 fn main() {
     let scene = vec!(
-        Sphere { pos: Vector::new(50f32, 0f32, 200f32), radius: 10f32, color: [0, 255, 0, 255] },
-        Sphere { pos: Vector::new(0f32, 0f32, 400f32), radius: 50f32, color: [255, 0, 0, 255] },
+        Sphere { pos: Vector::new(50f32, 0f32, 200f32), radius: 10f32, reflectance: [100, 100, 100, 100], color: [0, 59, 0, 150] },
+        Sphere { pos: Vector::new(0f32, 0f32, 400f32), radius: 50f32, reflectance: [100, 100, 100, 100], color: [190, 0, 0, 255] },
     );
 
     let mut img = ImageBuffer::new(SIZE as u32, SIZE as u32);
@@ -17,29 +17,36 @@ fn main() {
         let dir_x = (x as f32 - 511.0 / 2.0).round();
         let dir_y = (-(y as f32) + 511.0 / 2.0).round();
 
-        *pixel = image::Rgba(trace_path(Ray{ pos: Vector::new(dir_x, dir_y, 0.0), dir: Vector::new(dir_x / 256.0, dir_y / 256.0, 1.0) }, &scene));
+        *pixel = image::Rgba(trace_path(Ray{ 
+            pos: Vector::new(dir_x, dir_y, 0.0), 
+            dir: Vector::new(dir_x / 256.0, dir_y / 256.0, 1.0) ,
+        }, 0, &scene));
     }
 
     img.save("output.png").unwrap();
 }
 
-fn trace_path(ray: Ray, scene: &Vec<Sphere>) -> [u8; 4] {
-    let object = object_hit(&ray, &scene);
-
-    if object.is_none() {
+fn trace_path(ray: Ray, depth: u8, scene: &Vec<Sphere>) -> [u8; 4] {
+    if depth >= 8 {
         return [0, 0, 0, 255];
     }
 
-    let sphere = object.unwrap();
+    let value = ray.hit(&scene);
 
-    sphere.color
+    if value.is_none() {
+        return [0, 0, 0, 255];
+    }
+
+    let (sphere, new_ray) = value.unwrap();
+
+    let emittance = sphere.color;
+
+    let incoming = trace_path(new_ray, depth + 1, &scene);
+
+    [emittance[0].saturating_add(incoming[0]), emittance[1].saturating_add(incoming[1]), emittance[2].saturating_add(incoming[2]), emittance[3].saturating_add(incoming[3]) ]
 }
 
-fn object_hit<'a>(ray: &Ray, scene: &'a Vec<Sphere>) -> Option<&'a Sphere> {
-    scene.iter().find(|sphere| intersect(&ray, &sphere).is_some())
-}
-
-fn intersect(ray: &Ray, sphere: &Sphere) -> Option<Vector> {
+fn intersect<'a>(ray: &Ray, sphere: &'a Sphere) -> Option<(&'a Sphere, Ray)> {
     // Vector between the sphere center and the ray position
     let u = sphere.pos.sub(&ray.pos);
 
@@ -57,16 +64,18 @@ fn intersect(ray: &Ray, sphere: &Sphere) -> Option<Vector> {
         let c_2 = (distance.powi(2) + sphere.radius.powi(2)).sqrt();
         let new_ray = puv.sub(&ray.dir.scale(c_2));
         
-        Some(new_ray)
+        Some((&sphere, Ray { pos: new_ray, dir: Vector::new(0.1, 0.5, -0.5) }))
     } else {
         None
     }
 }
 
 // Just use spheres for now
+#[derive(Debug)]
 struct Sphere {
     pos: Vector,
     radius: f32,
+    reflectance: [u8; 4],
     color: [u8; 4]
 }
 
@@ -123,6 +132,12 @@ impl Vector {
 struct Ray {
     pos: Vector,
     dir: Vector,
+}
+
+impl Ray {
+    fn hit<'a>(&self, scene: &'a Vec<Sphere>) -> Option<(&'a Sphere, Ray)> {
+        scene.iter().map(|sphere| intersect(self, &sphere)).find(|data| data.is_some()).unwrap_or(None)
+    }
 }
 
 // Probably more information need for this
