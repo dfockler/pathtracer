@@ -1,4 +1,7 @@
 extern crate image;
+extern crate rand;
+
+use rand::prelude::*;
 
 use image::{ImageBuffer};
 use std::f32;
@@ -7,8 +10,8 @@ const SIZE: f32 = 512.0;
 
 fn main() {
     let scene = vec!(
-        Sphere { pos: Vector::new(50f32, 0f32, 200f32), radius: 10f32, reflectance: [100, 100, 100, 100], color: [0, 59, 0, 150] },
-        Sphere { pos: Vector::new(0f32, 0f32, 400f32), radius: 50f32, reflectance: [100, 100, 100, 100], color: [190, 0, 0, 255] },
+        // Sphere { pos: Vector::new(50f32, 0f32, 200f32), radius: 10f32, reflectance: [100, 100, 100, 100], color: [0, 59, 0, 150] },
+        Sphere { pos: Vector::new(0f32, 0f32, 100f32), radius: 50f32, reflectance: [100, 100, 100, 100], color: [190, 0, 0, 255] },
     );
 
     let mut img = ImageBuffer::new(SIZE as u32, SIZE as u32);
@@ -19,7 +22,7 @@ fn main() {
 
         *pixel = image::Rgba(trace_path(Ray{ 
             pos: Vector::new(dir_x, dir_y, 0.0), 
-            dir: Vector::new(dir_x / 256.0, dir_y / 256.0, 1.0) ,
+            dir: Vector::new(dir_x / 255.0, dir_y / 255.0, 1.0) ,
         }, 0, &scene));
     }
 
@@ -59,12 +62,17 @@ fn intersect<'a>(ray: &Ray, sphere: &'a Sphere) -> Option<(&'a Sphere, Ray)> {
     // Find the distance between the sphere and the ray
     let distance = puv.dist(&sphere.pos);
 
-    if distance < sphere.radius {
+    if distance <= sphere.radius {
         // Distance between the projection and the sphere
-        let c_2 = (distance.powi(2) + sphere.radius.powi(2)).sqrt();
-        let new_ray = puv.sub(&ray.dir.scale(c_2));
+        let c_2 = (sphere.radius.powi(2) + distance.powi(2)).sqrt();
+        let intersection_point = puv.sub(&ray.dir.scale(c_2));
+        let f = sphere.pos.sub(&intersection_point);
+        let ran: f32 = random();
+        let normal = f.div(sphere.radius).sub(&Vector { x: 0.0, y: 0.0, z: 2.0 + ran });
+
+        println!("{:?}", normal);
         
-        Some((&sphere, Ray { pos: new_ray, dir: Vector::new(0.1, 0.5, -0.5) }))
+        Some((&sphere, Ray { pos: intersection_point, dir: normal }))
     } else {
         None
     }
@@ -104,6 +112,14 @@ impl Vector {
             x: self.x * factor,
             y: self.y * factor,
             z: self.z * factor,
+        }
+    }
+
+    fn div(&self, factor: f32) -> Vector {
+        Vector {
+            x: self.x / factor,
+            y: self.y / factor,
+            z: self.z / factor,
         }
     }
 
