@@ -7,22 +7,27 @@ use image::{ImageBuffer};
 use std::f32;
 
 const SIZE: f32 = 512.0;
+const PI: u8 = 3;
 
 fn main() {
     let scene = vec!(
-        // Sphere { pos: Vector::new(50f32, 0f32, 200f32), radius: 10f32, reflectance: [100, 100, 100, 100], color: [0, 59, 0, 150] },
-        Sphere { pos: Vector::new(0f32, 0f32, 100f32), radius: 50f32, reflectance: [100, 100, 100, 100], color: [190, 0, 0, 255] },
+        Sphere { pos: Vector::new(0f32, 10f32, 50f32), radius: 10f32, reflectance: [1, 1, 1, 6], color: [1, 1, 1, 0] },
+        Sphere { pos: Vector::new(0f32, 0f32, 100f32), radius: 50f32, reflectance: [1, 1, 1, 4], color: [1, 1, 3, 255] },
     );
 
     let mut img = ImageBuffer::new(SIZE as u32, SIZE as u32);
 
     for (x, y, pixel) in img.enumerate_pixels_mut() {
-        let dir_x = (x as f32 - 511.0 / 2.0).round();
-        let dir_y = (-(y as f32) + 511.0 / 2.0).round();
+        let x_shift = (x as f32 - 511.0 / 2.0).round();
+        let y_shift = (-(y as f32) + 511.0 / 2.0).round();
+
+        let start = Vector::new(0.0, 0.0, 0.0);
+        let end = Vector::new(x_shift, y_shift, 256.0);
+        let dist = start.dist(&end);
 
         *pixel = image::Rgba(trace_path(Ray{ 
-            pos: Vector::new(dir_x, dir_y, 0.0), 
-            dir: Vector::new(dir_x / 255.0, dir_y / 255.0, 1.0) ,
+            pos: Vector::new(x_shift, y_shift, 0.0), 
+            dir: end.div(dist),
         }, 0, &scene));
     }
 
@@ -42,37 +47,43 @@ fn trace_path(ray: Ray, depth: u8, scene: &Vec<Sphere>) -> [u8; 4] {
 
     let (sphere, new_ray) = value.unwrap();
 
+    // @TODO: Figure this part out now
+    let brdf = [
+        sphere.reflectance[0] / PI,
+        sphere.reflectance[1] / PI,
+        sphere.reflectance[2] / PI,
+        sphere.reflectance[3] / PI,
+    ];
+
     let emittance = sphere.color;
 
     let incoming = trace_path(new_ray, depth + 1, &scene);
 
-    [emittance[0].saturating_add(incoming[0]), emittance[1].saturating_add(incoming[1]), emittance[2].saturating_add(incoming[2]), emittance[3].saturating_add(incoming[3]) ]
+    [
+        emittance[0].saturating_add(brdf[0].saturating_mul(incoming[0])),
+        emittance[1].saturating_add(brdf[1].saturating_mul(incoming[1])),
+        emittance[2].saturating_add(brdf[2].saturating_mul(incoming[2])),
+        emittance[3].saturating_add(brdf[3].saturating_mul(incoming[3])),
+    ]
 }
 
 fn intersect<'a>(ray: &Ray, sphere: &'a Sphere) -> Option<(&'a Sphere, Ray)> {
     // Vector between the sphere center and the ray position
-    let u = sphere.pos.sub(&ray.pos);
+    let proj_length = sphere.pos.dot(&ray.dir);
+    let intercept = ray.dir.scale(proj_length);
+    let intercept_length = sphere.pos.dist(&intercept);
 
-    // Dot product of the distance vector and the ray direction
-    let v_dot_u = u.dot(&ray.dir);
-
-    // Scale the normalized direction vector by the dot product
-    let puv = ray.dir.scale(v_dot_u);
-
-    // Find the distance between the sphere and the ray
-    let distance = puv.dist(&sphere.pos);
-
-    if distance <= sphere.radius {
-        // Distance between the projection and the sphere
-        let c_2 = (sphere.radius.powi(2) + distance.powi(2)).sqrt();
-        let intersection_point = puv.sub(&ray.dir.scale(c_2));
-        let f = sphere.pos.sub(&intersection_point);
-        let ran: f32 = random();
-        let normal = f.div(sphere.radius).sub(&Vector { x: 0.0, y: 0.0, z: 2.0 + ran });
-
-        println!("{:?}", normal);
+    if intercept_length <= sphere.radius {
+        let ray_intercept = ray.pos.dist(&intercept);
+        let intercept_side = (sphere.radius.powi(2) - intercept_length.powi(2)).sqrt();
+        let t1 = ray_intercept - intercept_side;
+        // let t2 = ray_intercept + intercept_side;
+        let t1v = ray.dir.scale(t1);
+        let dir = t1v.cross(&sphere.pos).div(sphere.radius);
+        // let t2v = ray.dir.scale(t2);
         
-        Some((&sphere, Ray { pos: intersection_point, dir: normal }))
+        // @TODO: Verify the normal of the new ray is correct
+        Some((&sphere, Ray { pos: t1v, dir: dir }))
     } else {
         None
     }
@@ -140,6 +151,14 @@ impl Vector {
             x: self.x + other.x,
             y: self.y + other.y,
             z: self.z + other.z,
+        }
+    }
+
+    fn cross(&self, other: &Vector) -> Vector {
+        Vector {
+            x: self.y * other.z - self.z * other.y,
+            y: self.z * other.x - self.x * other.z,
+            z: self.x * other.y - self.y * other.x,
         }
     }
 }
