@@ -7,7 +7,8 @@ const PI: u8 = 3;
 
 fn main() {
     let scene = vec!(
-        Sphere { pos: Vector::new(100f32, 100f32, 200f32), radius: 100f32, reflectance: [255, 255, 255, 0], emittance: [0, 0, 0, 255], color: [0, 59, 0, 255] },
+        Sphere { pos: Vector::new(0f32, 10f32, 70f32), radius: 10f32, reflectance: [255, 255, 255, 255], emittance: [255, 255, 0, 255], color: [0, 59, 0, 255] },
+        Sphere { pos: Vector::new(20f32, 20f32, 50f32), radius: 10f32, reflectance: [255, 255, 255, 255], emittance: [255, 255, 0, 255], color: [0, 59, 0, 255] },
         Sphere { 
             pos: Vector::new(0f32, 0f32, 100f32),
             radius: 10f32,
@@ -20,15 +21,12 @@ fn main() {
     let mut img = ImageBuffer::new(SIZE as u32, SIZE as u32);
 
     for (x, y, pixel) in img.enumerate_pixels_mut() {
-        let x_shift = (x as f32 - 511.0 / 2.0).round();
-        let y_shift = (-(y as f32) + 511.0 / 2.0).round();
+        let dir_x = (x as f32 - 511.0 / 2.0).round();
+        let dir_y = (-(y as f32) + 511.0 / 2.0).round();
 
         let start = Vector::new(0.0, 0.0, 0.0);
-        let end = Vector::new(x_shift, y_shift, 256.0);
+        let end = Vector::new(dir_x, dir_y, 512.0);
         let dist = start.dist(&end);
-
-        let start = Vector::new(dir_x, dir_y, 0.0);
-        let end = Vector::new(dir_x, dir_y, 256.0);
 
         let unit = end.div(start.dist(&end));
 
@@ -56,21 +54,17 @@ fn trace_path(ray: Ray, depth: u8, scene: &Vec<Sphere>) -> [u8; 4] {
 
     let (sphere, new_ray) = value.unwrap();
 
-    let emittance = [
-        sphere.color[0].saturating_mul(sphere.emittance[0]),
-        sphere.color[1].saturating_mul(sphere.emittance[0]),
-        sphere.color[2].saturating_mul(sphere.emittance[0]),
-        255,
-    ];
+    println!("{:?}", new_ray);
+
+    let emittance = sphere.emittance;
 
     let incoming = trace_path(new_ray, depth + 1, &scene);
 
-    println!("{:?}", incoming);
 
     [
-        emittance[0],
-        emittance[1],
-        emittance[2],
+        emittance[0].saturating_add(incoming[0]),
+        emittance[1].saturating_add(incoming[1]),
+        emittance[2].saturating_add(incoming[2]),
         255,
     ]
 }
@@ -87,9 +81,9 @@ fn intersect<'a>(ray: &Ray, sphere: &'a Sphere) -> Option<(&'a Sphere, Ray)> {
         let t1 = ray_intercept - intercept_side;
         // let t2 = ray_intercept + intercept_side;
         let t1v = ray.dir.scale(t1);
-        let dir = t1v.cross(&sphere.pos).div(sphere.radius);
+        let dir = sphere.pos.sub(&t1v).div(t1);
         // let t2v = ray.dir.scale(t2);
-        
+
         // @TODO: Verify the normal of the new ray is correct
         Some((&sphere, Ray { pos: t1v, dir: dir }))
     } else {
