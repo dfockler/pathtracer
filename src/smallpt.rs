@@ -10,14 +10,89 @@ fn main() {
         Sphere { radius: 16.5, position: Vector::new(73.0,16.5,78.0),       emission: Vector::blank(), color: Vector::new(1.0,1.0,1.0).scale(0.999),  material: ReflectanceType::Refractive},//Glas
         Sphere { radius: 600.0, position: Vector::new(50.0,681.6-0.27,81.6), emission: Vector::new(12.0,12.0,12.0), color: Vector::blank(),  material: ReflectanceType::Diffuse},//Lite
     );
+
+    let width = 1024;
+    let height = 768;
+    let samples = 1;
+
+    let camera = Ray { position: Vec::new(50.0, 52.0, 295.6), direction: Vec::new(0.0, -0.042612, -1.0).norm() };
+    let cx = Vec::new(width * 0.5135 / height, 0.0, 0.0);
+    let cy = (cx.div(camera.direction)).norm().scale(0.5135);
+    let mut r = Vec::blank();
+    let mut output = Vec<Vector>::with_capacity(width*height);
+
+    for y in 0..height {
+        for x in 0..width {
+            for sy in 0..2 {
+                let i = (height - y - 1) * width + x;
+
+                for sx in 0..2 {
+                    for s in 0..samples {
+                        let r1 = 2 * rand();
+                        let r2 = 2 * rand();
+
+                        let dx = if r1 < 1.0 {
+                            r1.sqrt() - 1.0
+                        } else {
+                            1.0 - (2.0-r1).sqrt()
+                        };
+
+                        let dy = if r2 < 1.0 {
+                            r2.sqrt() - 1.0
+                        } else {
+                            1.0 - (2.0 - r2).sqrt()
+                        };
+
+                        let d = Vec::new(
+                            cx.scale( ((sx + 0.5 + dx) / 2.0 + x) / width - 0.5 ).add(cy.scale(((sy + 0.5 + dy) / 2.0 + y) / height - 0.5)).add(camera.direction),
+                            0.0,
+                            0.0,
+                        );
+
+                        r = r.add(
+                            radiance(
+                                Ray { origin: camera.origin.add(d).scale(140.0), direction: d.norm() },
+                                0,
+                                rand()
+                            ).scale( 1.0 / samples );
+                        );
+                    }
+
+                    output.index(i) = output.index(i).add(Vec::new(clamp(r.x), clamp(r.y), clamp(r.z)).scale(0.25));
+
+                    r = Vec::blank();
+                }
+            }
+        }
+    }
+
+    // Write out to a file.
 }
 
-fn intersect(ray: &Ray, scene: &Vec<Sphere>) -> bool {
-    let distance = std::f32::INFINITY;
-    for sphere in scene {
-        let d = sphere.intersect(ray);
-        if d < 
+fn clamp(x: f32) {
+    if x < 0.0 {
+        0.0
     }
+
+    if x > 1.0 {
+        1.0
+    } else {
+        x
+    }
+}
+
+
+fn intersect(ray: &Ray, scene: &Vec<Sphere>, distance: &mut f32, id: &mut usize) -> bool {
+    let mut distance = std::f32::INFINITY;
+    for index, sphere in scene.enumerate() {
+        let d = sphere.intersect(ray);
+        if d < distance {
+            distance = d;
+            id = index;
+        }
+    }
+
+    distance < std::f32::INFINITY;
 }
 
 struct Vector {
