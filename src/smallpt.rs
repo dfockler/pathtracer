@@ -1,3 +1,5 @@
+use rand::prelude::*;
+
 fn main() {
     let spheres = vec!(//Scene: radius, position, emission, color, material
         Sphere { radius: 1e5, position: Vector::new(1e5+1,40.8,81.6),   emission: Vector::blank(), color: Vector::new(0.75,0.25,0.25), material: ReflectanceType::Diffuse },//Left
@@ -28,8 +30,8 @@ fn main() {
 
                 for sx in 0..2 {
                     for s in 0..samples {
-                        let r1 = 2 * rand();
-                        let r2 = 2 * rand();
+                        let r1 = 2.0 * rand::random::rand::randomom<f32>();
+                        let r2 = 2.0 * rand::random::rand::randomom<f32>();
 
                         let dx = if r1 < 1.0 {
                             r1.sqrt() - 1.0
@@ -52,8 +54,8 @@ fn main() {
                         r = r.add(
                             radiance(
                                 Ray { origin: camera.origin.add(d).scale(140.0), direction: d.norm() },
-                                0,
-                                rand()
+                                &spheres,
+                                0
                             ).scale( 1.0 / samples );
                         );
                     }
@@ -67,6 +69,55 @@ fn main() {
     }
 
     // Write out to a file.
+}
+
+fn radiance(ray: Ray, spheres: &Vec<Sphere>, depth: usize) -> Vector {
+    let mut distance = 0.0;
+    let mut id = 0;
+
+
+    if !intersect(&ray, spheres, distance, id) {
+        return Vector::blank();
+    }
+
+    let sphere = spheres[id];
+
+    let x = ray.origin.add(ray.direction).scale(t);
+    let n = x.sub(sphere.position).norm();
+    let nl = if n.dot(ray.direction) < 0 {
+        n
+    } else {
+        n.scale(-1.0)
+    };
+
+    let mut f = sphere.color;
+
+    let p = if f.x > f.y && f.x > f.z {
+        f.x
+    } else if f.y > f.z {
+        f.y
+    } else {
+        f.z
+    };
+
+    if depth > 5 {
+        if rand::random() < p {
+            f = f.scale(1.0 / p);
+        } else {
+            return sphere.emission;
+        }
+    }
+
+    match sphere.material {
+        ReflectanceType::Diffuse => {
+
+        },
+        ReflectanceType::Specular => {
+
+        },
+        _ => (),
+    }
+
 }
 
 fn clamp(x: f32) {
